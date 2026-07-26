@@ -14,6 +14,10 @@ concurrency:
 jobs:
   preload:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [duchamp, vivo-PD2417]
 
     steps:
       - uses: actions/checkout@v4
@@ -28,25 +32,25 @@ jobs:
 
       - name: Build preload.so
         run: |
-          make PROJECT=duchamp \
+          make PROJECT=${{ matrix.project }} \
             CC=/opt/ndk-r29/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang
 
       - name: Verify
         run: |
-          file build/duchamp/bin/preload.so
-          sha256sum build/duchamp/bin/preload.so
+          file build/${{ matrix.project }}/bin/preload.so
+          sha256sum build/${{ matrix.project }}/bin/preload.so
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: preload-duchamp-aarch64
-          path: build/duchamp/bin/preload.so
+          name: preload-${{ matrix.project }}-aarch64
+          path: build/${{ matrix.project }}/bin/preload.so
 
       - name: Upload to release (manual)
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: build/duchamp/bin/preload.so
+          files: build/${{ matrix.project }}/bin/preload.so
 
   autorelease:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -62,11 +66,19 @@ jobs:
         id: tag
         run: echo "value=release-${GITHUB_SHA::10}" >> $GITHUB_OUTPUT
 
-      - name: Download build
+      - name: Download all builds
         uses: actions/download-artifact@v4
         with:
-          name: preload-duchamp-aarch64
-          path: .
+          path: artifacts
+
+      - name: Rename artifacts for release
+        run: |
+          mkdir -p release
+          for dir in artifacts/preload-*-aarch64; do
+            proj=$(basename "$dir" | sed 's/preload-//; s/-aarch64//')
+            cp "$dir/preload.so" "release/preload-${proj}.so"
+          done
+          ls -la release/
 
       - name: Create or update release
         uses: ncipollo/release-action@v1
@@ -75,7 +87,7 @@ jobs:
           name: Build ${{ steps.tag.outputs.value }}
           commit: ${{ github.sha }}
           body: "Automated build from commit ${{ github.sha }}"
-          artifacts: preload.so
+          artifacts: "release/preload-*.so"
           allowUpdates: true
           replacesArtifacts: true
           makeLatest: true
