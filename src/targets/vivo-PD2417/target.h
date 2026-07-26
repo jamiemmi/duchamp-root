@@ -109,7 +109,14 @@
 #define LEFT_OFF 0x5550
 #define FAKE_TASK_OFF 0x3200
 
-/* rt_mutex_waiter struct offsets (verify for 6.1) */
+/*
+ * rt_mutex_waiter struct offsets for kernel 6.1 (SMALL layout, no tree_prio etc.)
+ * Verified by disassembling task_blocks_on_rt_mutex:
+ *   stp x20, x19, [x21, #48]  → task=0x30, lock=0x38
+ *   str w8, [x21, #68]         → prio=0x44
+ *   str x9, [x21, #72]         → deadline=0x48
+ *   add x0, x21, #0x18         → pi_tree_entry=0x18
+ */
 #define WAITER_LOCAL_OFF 0x80
 #define WAITER_TREE_ENTRY_OFF 0x00
 #define WAITER_PI_TREE_ENTRY_OFF 0x18
@@ -120,15 +127,18 @@
 #define WAITER_DEADLINE_OFF 0x48
 #define WAITER_WW_CTX_OFF 0x50
 
-#define FAKE_WAITER_TREE_PRIO_OFF 0x18
-#define FAKE_WAITER_TREE_DEADLINE_OFF 0x20
-#define FAKE_WAITER_PI_TREE_ENTRY_OFF 0x28
-#define FAKE_WAITER_PI_TREE_PRIO_OFF 0x40
+/* FAKE_WAITER offsets for kernel 6.1 SMALL waiter struct
+ * (no separate tree_prio/tree_deadline/pi_prio/pi_deadline fields;
+ *  prio at 0x44 and deadline at 0x48 are shared for tree & pi_tree) */
+#define FAKE_WAITER_TREE_PRIO_OFF 0x44
+#define FAKE_WAITER_TREE_DEADLINE_OFF 0x48
+#define FAKE_WAITER_PI_TREE_ENTRY_OFF 0x18
+#define FAKE_WAITER_PI_TREE_PRIO_OFF 0x44
 #define FAKE_WAITER_PI_TREE_DEADLINE_OFF 0x48
-#define FAKE_WAITER_TASK_OFF 0x50
-#define FAKE_WAITER_LOCK_OFF 0x58
-#define FAKE_WAITER_WAKE_STATE_OFF 0x60
-#define FAKE_WAITER_WW_CTX_OFF 0x68
+#define FAKE_WAITER_TASK_OFF 0x30
+#define FAKE_WAITER_LOCK_OFF 0x38
+#define FAKE_WAITER_WAKE_STATE_OFF 0x40
+#define FAKE_WAITER_WW_CTX_OFF 0x50
 
 /* task_struct offsets (copied from duchamp kernel 6.6; VERIFY for 6.1) */
 #define FAKE_TASK_USAGE_OFF 0x40
